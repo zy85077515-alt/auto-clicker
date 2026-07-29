@@ -109,7 +109,7 @@ object TemplateMatcher {
         val src = MatOfPoint2f()
         val dst = MatOfPoint2f()
         val dstCorners = MatOfPoint2f()
-        val h = Mat()
+        var h: Mat? = null
         try {
             Utils.bitmapToMat(screen, sMat)
             Imgproc.cvtColor(sMat, sGray, Imgproc.COLOR_RGBA2GRAY)
@@ -126,8 +126,8 @@ object TemplateMatcher {
             val scrPts = kp.toList()
             src.release(); src.fromArray(*good.map { tmplPts[it.trainIdx].pt }.toTypedArray())
             dst.release(); dst.fromArray(*good.map { scrPts[it.queryIdx].pt }.toTypedArray())
-            Calib3d.findHomography(src, dst, h, Calib3d.RANSAC, 5.0)
-            if (h.empty()) return Result.miss("单应失败 g=${good.size}")
+            h = Calib3d.findHomography(src, dst, Calib3d.RANSAC, 5.0)
+            if (h == null || h.empty()) return Result.miss("单应失败 g=${good.size}")
             // 用单应矩阵把模板四角映射到屏幕，求中心
             val corners = arrayOf(
                 Point(0.0, 0.0),
@@ -143,7 +143,8 @@ object TemplateMatcher {
         } finally {
             sMat.release(); sGray.release()
             kp.release(); desc.release(); raw.release()
-            src.release(); dst.release(); dstCorners.release(); h.release()
+            src.release(); dst.release(); dstCorners.release()
+            h?.release()
         }
     }
 }
