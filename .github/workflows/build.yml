@@ -27,8 +27,8 @@ jobs:
       - name: Accept licenses
         run: yes | sdkmanager --licenses > /dev/null || true
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Fix line endings and grant execute permission
+        run: sed -i 's/\r$//' gradlew && chmod +x gradlew
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon

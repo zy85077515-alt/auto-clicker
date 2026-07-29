@@ -1,0 +1,10 @@
+# 自动归一化行尾：仓库内统一存 LF，检出时按平台转换
+* text=auto eol=lf
+
+# Gradle Wrapper 脚本在所有平台都必须为 LF，否则 Linux CI 会执行失败
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+
+# Windows 专用脚本保持 CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
