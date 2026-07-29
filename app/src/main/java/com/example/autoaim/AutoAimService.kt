@@ -206,10 +206,10 @@ class AutoAimService : Service() {
                 return
             }
             val dir = if (Config.invert) -1 else 1
-            val sx = if (Config.dragStartX < 0) cx else Config.dragStartX
-            val sy = if (Config.dragStartY < 0) cy else Config.dragStartY
-            val ex = sx + offX * Config.sensitivity * dir
-            val ey = sy + offY * Config.sensitivity * dir
+            val sx = (if (Config.dragStartX < 0) cx else Config.dragStartX).toFloat()
+            val sy = (if (Config.dragStartY < 0) cy else Config.dragStartY).toFloat()
+            val ex = sx + (offX * Config.sensitivity * dir).toFloat()
+            val ey = sy + (offY * Config.sensitivity * dir).toFloat()
             g.swipe(sx, sy, ex, ey, 150)
         } catch (e: Exception) {
             updateStatus("错误: ${e.message}")

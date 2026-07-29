@@ -121,7 +121,7 @@ object TemplateMatcher {
             Point(0.0, tmplH.toDouble())
         )
         val dstCorners = MatOfPoint2f()
-        Calib3d.perspectiveTransform(MatOfPoint2f(*corners), dstCorners, h)
+        Core.perspectiveTransform(MatOfPoint2f(*corners), dstCorners, h)
         val pts = dstCorners.toList()
         val cx = pts.map { it.x }.average()
         val cy = pts.map { it.y }.average()
