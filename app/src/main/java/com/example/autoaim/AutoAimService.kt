@@ -43,6 +43,9 @@ class AutoAimService : Service() {
         const val EXTRA_RESULT_CODE = "rc"
         const val EXTRA_DATA = "data"
         var isRunning = false
+        /** 由 CropActivity 在保存模板后置位，强制下一帧重新加载模板（即使路径未变） */
+        @Volatile
+        var pendingTemplateReload = false
     }
 
     override fun onCreate() {
@@ -134,6 +137,8 @@ class AutoAimService : Service() {
     }
 
     private fun openCapture() {
+        FrameHolder.lastFrame?.let { if (!it.isRecycled) it.recycle() }
+        FrameHolder.lastFrame = null
         val frame = capturer.capture()
         if (frame != null) FrameHolder.lastFrame = frame
         startActivity(Intent(this, CropActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -159,19 +164,34 @@ class AutoAimService : Service() {
 
     private fun doAim() {
         try {
+            if (pendingTemplateReload) {
+                pendingTemplateReload = false
+                loadedTemplatePath = null
+            }
             val path = Config.templatePath
-            if (path != loadedTemplatePath) {
+            // 路径变化、或模板尚未成功建立但路径已存在时，重新加载
+            val needReload = path != loadedTemplatePath ||
+                    (templateBitmap == null && path != null && File(path).exists())
+            if (needReload) {
                 templateBitmap = if (path != null && File(path).exists())
                     BitmapFactory.decodeFile(path) else null
                 loadedTemplatePath = path
                 if (templateBitmap != null) {
                     // 模板交由 TemplateMatcher 内部缩放到固定尺寸，避免按屏幕 scale 过度缩小导致特征丢失
                     TemplateMatcher.setTemplate(templateBitmap!!)
+                } else {
+                    TemplateMatcher.clearTemplate()
                 }
             }
             val tmpl = templateBitmap
             if (tmpl == null) {
                 updateStatus("尚未设置识别模板")
+                return
+            }
+            if (!TemplateMatcher.isTemplateReady()) {
+                // 已选模板但无可用特征：给出明确原因并允许下次重试（不再永久缓存失败）
+                loadedTemplatePath = null
+                updateStatus(TemplateMatcher.lastTemplateError ?: "模板未就绪")
                 return
             }
 
