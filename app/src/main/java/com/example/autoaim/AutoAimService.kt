@@ -165,6 +165,13 @@ class AutoAimService : Service() {
                 templateBitmap = if (path != null && File(path).exists())
                     BitmapFactory.decodeFile(path) else null
                 loadedTemplatePath = path
+                if (templateBitmap != null) {
+                    val tw = maxOf(1, (templateBitmap!!.width * scale).toInt())
+                    val th = maxOf(1, (templateBitmap!!.height * scale).toInt())
+                    val scaledTmpl = ImageUtils.downscaleTo(templateBitmap!!, tw, th)
+                    TemplateMatcher.setTemplate(scaledTmpl)
+                    scaledTmpl.recycle()
+                }
             }
             val tmpl = templateBitmap
             if (tmpl == null) {
@@ -175,28 +182,18 @@ class AutoAimService : Service() {
             val frame = capturer.capture() ?: return
             FrameHolder.lastFrame = frame
             val scaledScreen = ImageUtils.downscale(frame, Config.maxDim)
-            val tw = maxOf(1, (tmpl.width * scale).toInt())
-            val th = maxOf(1, (tmpl.height * scale).toInt())
-            val scaledTmpl = ImageUtils.downscaleTo(tmpl, tw, th)
-            val screenGray = ImageUtils.toGrayscale(scaledScreen)
-            val tmplGray = ImageUtils.toGrayscale(scaledTmpl)
-            val res = TemplateMatcher.match(
-                screenGray, scaledScreen.width, scaledScreen.height,
-                tmplGray, scaledTmpl.width, scaledTmpl.height,
-                Config.step, Config.threshold
-            )
+            val res = TemplateMatcher.match(scaledScreen, Config.minMatches)
             scaledScreen.recycle()
-            scaledTmpl.recycle()
             frame.recycle()
 
             val cx = screenW / 2f
             val cy = screenH / 2f
             if (!res.found) {
-                updateStatus("未识别到目标  score=%.2f".format(res.score))
+                updateStatus("未识别到目标")
                 return
             }
-            val tx = (res.x + scaledTmpl.width / 2f) / scale
-            val ty = (res.y + scaledTmpl.height / 2f) / scale
+            val tx = res.cx / scale
+            val ty = res.cy / scale
             val offX = cx - tx
             val offY = cy - ty
             val dist = sqrt(offX * offX + offY * offY)

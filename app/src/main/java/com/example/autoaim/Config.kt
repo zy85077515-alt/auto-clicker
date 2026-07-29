@@ -22,6 +22,11 @@ object Config {
         get() = prefs.getFloat("threshold", 0.75f)
         set(v) = prefs.edit().putFloat("threshold", v).apply()
 
+    // OpenCV 特征匹配：判定为命中所需的最少好匹配数（越大越严格）
+    var minMatches: Int
+        get() = prefs.getInt("minMatches", 12)
+        set(v) = prefs.edit().putInt("minMatches", v).apply()
+
     var intervalMs: Long
         get() = prefs.getLong("intervalMs", 500)
         set(v) = prefs.edit().putLong("intervalMs", v).apply()

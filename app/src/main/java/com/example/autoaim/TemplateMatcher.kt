@@ -1,90 +1,140 @@
 package com.example.autoaim
 
-import kotlin.math.sqrt
+import android.graphics.Bitmap
+import android.util.Log
+import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
+import org.opencv.calib3d.Calib3d
+import org.opencv.core.Core
+import org.opencv.core.Mat
+import org.opencv.core.MatOfDMatch
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.core.MatOfPoint2f
+import org.opencv.core.Point
+import org.opencv.features2d.BFMatcher
+import org.opencv.features2d.ORB
+import org.opencv.imgproc.Imgproc
 
+/**
+ * OpenCV 特征点匹配（ORB + 单应矩阵）。
+ * 相比纯 NCC 模板匹配，对目标缩放 / 旋转具有不变性，
+ * 适合实战中目标大小、角度变化较大的场景。
+ */
 object TemplateMatcher {
 
-    data class Result(val found: Boolean, val x: Int, val y: Int, val score: Float)
+    private const val TAG = "TemplateMatcher"
+    private const val MAX_FEATURES = 2000
 
-    /**
-     * 归一化互相关（NCC）模板匹配，使用积分图加速方差计算。
-     * screen/tmpl 为灰度数组；sw/sh、tw/th 为对应尺寸。
-     * step 为扫描步长（越大越快但越不精确）；threshold 为匹配阈值。
-     */
-    fun match(
-        screen: IntArray, sw: Int, sh: Int,
-        tmpl: IntArray, tw: Int, th: Int,
-        step: Int, threshold: Float
-    ): Result {
-        if (tw > sw || th > sh || tw <= 0 || th <= 0) return Result(false, 0, 0, 0f)
+    data class Result(val found: Boolean, val cx: Int, val cy: Int, val score: Float)
 
-        var tSum = 0L
-        var tSumSq = 0L
-        for (v in tmpl) {
-            val i = v.toLong()
-            tSum += i
-            tSumSq += i * i
-        }
-        val n = (tw * th).toDouble()
-        val tMean = tSum / n
-        val tStd = sqrt(tSumSq / n - tMean * tMean)
-        if (tStd <= 0.0) return Result(false, 0, 0, 0f)
+    private var initialized = false
+    private var orb: ORB? = null
+    private var matcher: BFMatcher? = null
 
-        val stride = sw + 1
-        val iSum = LongArray(stride * (sh + 1))
-        val iSq = LongArray(stride * (sh + 1))
-        for (y in 0 until sh) {
-            var rowSum = 0L
-            var rowSq = 0L
-            val base = (y + 1) * stride
-            val prev = y * stride
-            for (x in 0 until sw) {
-                val v = screen[y * sw + x].toLong()
-                rowSum += v
-                rowSq += v * v
-                iSum[base + x + 1] = iSum[prev + x + 1] + rowSum
-                iSq[base + x + 1] = iSq[prev + x + 1] + rowSq
+    private var tmplKp: MatOfKeyPoint? = null
+    private var tmplDesc: Mat? = null
+    private var tmplW = 0
+    private var tmplH = 0
+
+    @Synchronized
+    private fun ensureInit() {
+        if (initialized) return
+        try {
+            if (!OpenCVLoader.initLocal()) {
+                Log.w(TAG, "OpenCVLoader.initLocal 返回 false，将依赖自动加载")
             }
+        } catch (e: Throwable) {
+            Log.w(TAG, "OpenCVLoader.initLocal 异常: ${e.message}")
         }
+        orb = ORB.create(MAX_FEATURES)
+        matcher = BFMatcher.create(ORB.NORM_HAMMING, true) // crossCheck
+        initialized = true
+    }
 
-        val st = step.coerceAtLeast(1)
-        var bestScore = -2.0
-        var bx = 0
-        var by = 0
-        val maxX = sw - tw
-        val maxY = sh - th
-        for (y in 0..maxY step st) {
-            for (x in 0..maxX step st) {
-                val x2 = x + tw
-                val y2 = y + th
-                val s = iSum[y2 * stride + x2] - iSum[y * stride + x2] -
-                        iSum[y2 * stride + x] + iSum[y * stride + x]
-                val sSq = iSq[y2 * stride + x2] - iSq[y * stride + x2] -
-                        iSq[y2 * stride + x] + iSq[y * stride + x]
-                val meanW = s / n
-                val varW = sSq / n - meanW * meanW
-                if (varW <= 1e-6) continue
+    private fun bitmapToGray(bmp: Bitmap): Mat {
+        val argb = Mat()
+        val copy = if (bmp.config == Bitmap.Config.ARGB_8888) bmp
+        else bmp.copy(Bitmap.Config.ARGB_8888, false)
+        Utils.bitmapToMat(copy, argb)
+        val gray = Mat()
+        Imgproc.cvtColor(argb, gray, Imgproc.COLOR_RGBA2GRAY)
+        argb.release()
+        return gray
+    }
 
-                var prod = 0.0
-                for (ty in 0 until th) {
-                    val sIdx = (y + ty) * sw + x
-                    val tIdx = ty * tw
-                    for (tx in 0 until tw) {
-                        prod += screen[sIdx + tx].toDouble() * tmpl[tIdx + tx].toDouble()
-                    }
-                }
-                val cov = prod - meanW * tSum - tMean * s + n * tMean * meanW
-                val denom = sqrt(varW) * tStd
-                val score = if (denom > 0) (cov / denom) else 0.0
-                if (score > bestScore) {
-                    bestScore = score
-                    bx = x
-                    by = y
-                }
-            }
+    fun setTemplate(tmpl: Bitmap) {
+        ensureInit()
+        val gray = bitmapToGray(tmpl)
+        tmplW = gray.width()
+        tmplH = gray.height()
+        tmplKp?.release()
+        tmplDesc?.release()
+        tmplKp = MatOfKeyPoint()
+        tmplDesc = Mat()
+        orb!!.detectAndCompute(gray, Mat(), tmplKp, tmplDesc)
+        gray.release()
+        Log.i(TAG, "模板特征点数量: ${tmplKp?.toList()?.size ?: 0}")
+    }
+
+    fun match(screen: Bitmap, minGood: Int): Result {
+        ensureInit()
+        val tkp = tmplKp
+        val tdesc = tmplDesc
+        if (tkp == null || tdesc == null || tdesc.empty() || tkp.toList().isEmpty()) {
+            return Result(false, 0, 0, 0f)
         }
+        val gray = bitmapToGray(screen)
+        val kp = MatOfKeyPoint()
+        val desc = Mat()
+        orb!!.detectAndCompute(gray, Mat(), kp, desc)
+        gray.release()
+        if (desc.empty() || kp.toList().isEmpty()) {
+            kp.release()
+            desc.release()
+            return Result(false, 0, 0, 0f)
+        }
+        val matches = MatOfDMatch()
+        matcher!!.match(desc, tdesc, matches)
+        val all = matches.toArray().toMutableList()
+        matches.release()
+        desc.release()
+        all.sortBy { it.distance }
+        val good = all.take(minOf(all.size, 120))
+        if (good.size < minGood) {
+            kp.release()
+            return Result(false, 0, 0, 0f)
+        }
+        val src = ArrayList<Point>() // 模板点 (train)
+        val dst = ArrayList<Point>() // 屏幕点 (query)
+        val tList = tkp.toList()
+        val sList = kp.toList()
+        for (m in good) {
+            src.add(tList[m.trainIdx].pt)
+            dst.add(sList[m.queryIdx].pt)
+        }
+        kp.release()
+        val srcMat = MatOfPoint2f(*src.toTypedArray())
+        val dstMat = MatOfPoint2f(*dst.toTypedArray())
+        val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 4.0)
+        srcMat.release()
+        dstMat.release()
+        if (h == null || h.empty()) {
+            return Result(false, 0, 0, good.size.toFloat())
+        }
+        val center = MatOfPoint2f(Point(tmplW / 2.0, tmplH / 2.0))
+        val dstCenter = MatOfPoint2f()
+        Core.perspectiveTransform(center, dstCenter, h)
+        val p = dstCenter.toArray()[0]
+        center.release()
+        dstCenter.release()
+        h.release()
+        return Result(true, p.x.toInt(), p.y.toInt(), good.size.toFloat())
+    }
 
-        val found = bestScore >= threshold
-        return Result(found, bx, by, bestScore.toFloat())
+    fun release() {
+        tmplKp?.release()
+        tmplDesc?.release()
+        tmplKp = null
+        tmplDesc = null
     }
 }
