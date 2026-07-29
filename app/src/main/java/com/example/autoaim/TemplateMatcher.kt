@@ -47,7 +47,7 @@ object TemplateMatcher {
             Log.w(TAG, "OpenCVLoader.initLocal 异常: ${e.message}")
         }
         orb = ORB.create(MAX_FEATURES)
-        matcher = BFMatcher.create(ORB.NORM_HAMMING, true) // crossCheck
+        matcher = BFMatcher.create(Core.NORM_HAMMING, true) // crossCheck
         initialized = true
     }
 

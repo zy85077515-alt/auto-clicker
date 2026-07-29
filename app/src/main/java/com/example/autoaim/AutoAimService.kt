@@ -21,7 +21,6 @@ import android.widget.Button
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import java.io.File
-import kotlin.math.maxOf
 import kotlin.math.sqrt
 
 class AutoAimService : Service() {
