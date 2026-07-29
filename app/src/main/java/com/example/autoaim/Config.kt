@@ -63,6 +63,16 @@ object Config {
         get() = prefs.getFloat("clickY", 0f)
         set(v) = prefs.edit().putFloat("clickY", v).apply()
 
+    // 点击的基础触摸时长（毫秒），原固定 1ms，这里改为更像真人的默认值
+    var tapBaseMs: Long
+        get() = prefs.getLong("tapBaseMs", 50)
+        set(v) = prefs.edit().putLong("tapBaseMs", v).apply()
+
+    // 点击触摸时长的随机抖动范围：实际时长 = 基础 ± [0, tapJitterMs]
+    var tapJitterMs: Int
+        get() = prefs.getInt("tapJitterMs", 50)
+        set(v) = prefs.edit().putInt("tapJitterMs", v).apply()
+
     var dragStartX: Float
         get() = prefs.getFloat("dragStartX", -1f)
         set(v) = prefs.edit().putFloat("dragStartX", v).apply()

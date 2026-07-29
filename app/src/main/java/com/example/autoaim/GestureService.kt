@@ -37,10 +37,10 @@ class GestureService : AccessibilityService() {
         return dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
     }
 
-    /** 模拟点击 */
-    fun tap(x: Float, y: Float): Boolean {
+    /** 模拟点击，durationMs 为触摸屏幕时长（毫秒），实际值由调用方叠加随机抖动 */
+    fun tap(x: Float, y: Float, durationMs: Long = 50L): Boolean {
         val path = Path().apply { moveTo(x, y) }
-        val stroke = GestureDescription.StrokeDescription(path, 0, 1)
+        val stroke = GestureDescription.StrokeDescription(path, 0, durationMs.coerceAtLeast(1))
         return dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
     }
 }
