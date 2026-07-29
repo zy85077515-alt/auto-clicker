@@ -7,11 +7,9 @@
         android:strokeColor="#FF0000"
         android:strokeWidth="2"
         android:pathData="M20,2 L20,38 M2,20 L38,20" />
-    <circle
-        android:cx="20"
-        android:cy="20"
-        android:r="9"
+    <path
         android:strokeColor="#FF0000"
         android:strokeWidth="2"
-        android:fillColor="#00000000" />
+        android:fillColor="#00000000"
+        android:pathData="M11,20 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
 </vector>
