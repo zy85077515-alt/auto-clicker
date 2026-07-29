@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:text="@string/app_name"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:id="@+id/tvHint"
+            android:textSize="13sp"
+            android:layout_marginTop="8dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btnStart"
+            android:text="启动"
+            android:layout_marginTop="12dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+            <Button
+                android:id="@+id/btnCapture"
+                android:text="截取模板"
+                android:layout_weight="1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content" />
+            <Button
+                android:id="@+id/btnPick"
+                android:text="选择点击点"
+                android:layout_weight="1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <TextView
+            android:text="参数设置"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <TextView android:text="移动灵敏度" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText
+            android:id="@+id/etSensitivity"
+            android:inputType="numberDecimal"
+            android:hint="1.0"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView android:text="匹配阈值 (0~1)" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText
+            android:id="@+id/etThreshold"
+            android:inputType="numberDecimal"
+            android:hint="0.75"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView android:text="识别间隔 (毫秒)" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText
+            android:id="@+id/etInterval"
+            android:inputType="number"
+            android:hint="500"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView android:text="对准容差 (像素)" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText
+            android:id="@+id/etTolerance"
+            android:inputType="number"
+            android:hint="15"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <CheckBox
+            android:id="@+id/cbLoop"
+            android:text="循环运行"
+            android:checked="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <CheckBox
+            android:id="@+id/cbClick"
+            android:text="对准后自动点击"
+            android:checked="true"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <CheckBox
+            android:id="@+id/cbInvert"
+            android:text="反转移动方向"
+            android:checked="false"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <TextView android:text="点击位置" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <RadioGroup
+            android:id="@+id/rgClickMode"
+            android:orientation="horizontal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+            <RadioButton
+                android:id="@+id/rbCenter"
+                android:text="屏幕中心"
+                android:checked="true" />
+            <RadioButton
+                android:id="@+id/rbPoint"
+                android:text="自定义点(选点)" />
+        </RadioGroup>
+
+        <Button
+            android:id="@+id/btnSave"
+            android:text="保存设置"
+            android:layout_marginTop="8dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:text="权限"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+        <Button
+            android:id="@+id/btnAccessibility"
+            android:text="开启无障碍服务"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+        <Button
+            android:id="@+id/btnOverlay"
+            android:text="开启悬浮窗权限"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView
+            android:text="流程：开启两项权限 → 启动 → 截取模板(框选目标) → 选点(可选) → 自动瞄准循环"
+            android:textSize="12sp"
+            android:layout_marginTop="12dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+</ScrollView>

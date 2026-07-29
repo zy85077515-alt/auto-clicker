@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:background="@android:color/transparent"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/crosshair"
+        android:src="@drawable/crosshair"
+        android:layout_gravity="center"
+        android:layout_width="40dp"
+        android:layout_height="40dp" />
+
+    <TextView
+        android:text="触摸屏幕任意位置，松手即设为点击点"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="24dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+</FrameLayout>

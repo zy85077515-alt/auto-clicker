@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">自动瞄准点击器</string>
+    <string name="accessibility_desc">自动瞄准点击器用于模拟滑动与点击手势，以实现自动瞄准与点击。</string>
+</resources>
