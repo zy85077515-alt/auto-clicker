@@ -111,6 +111,22 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <TextView android:text="点击前随机延迟 (毫秒, 最小)" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText
+            android:id="@+id/etTapDelayMin"
+            android:inputType="number"
+            android:hint="100"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <TextView android:text="点击前随机延迟 (毫秒, 最大)" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <EditText
+            android:id="@+id/etTapDelayMax"
+            android:inputType="number"
+            android:hint="1000"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <CheckBox
             android:id="@+id/cbLoop"
             android:text="循环运行"

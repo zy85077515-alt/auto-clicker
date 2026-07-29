@@ -222,6 +222,13 @@ class AutoAimService : Service() {
 
     private fun doClick() {
         val g = GestureService.instance ?: return
+        // 点击前随机延迟：[min, max] 毫秒，进一步避免机械节奏
+        val dmin = Config.tapPreDelayMinMs
+        val dmax = Config.tapPreDelayMaxMs
+        if (dmax > dmin) {
+            val delay = (dmin.toLong()..dmax.toLong()).random()
+            if (delay > 0) Thread.sleep(delay)
+        }
         // 点击坐标微抖动：落点在目标 ± [0, tapPosJitterPx] 像素内随机
         val pj = Config.tapPosJitterPx
         val prange = if (pj > 0) (-pj..pj) else (0..0)

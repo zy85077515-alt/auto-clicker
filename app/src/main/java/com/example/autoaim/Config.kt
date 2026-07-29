@@ -78,6 +78,15 @@ object Config {
         get() = prefs.getInt("tapPosJitterPx", 3)
         set(v) = prefs.edit().putInt("tapPosJitterPx", v).apply()
 
+    // 点击前的随机延迟区间（毫秒）：每次点击前等待 [tapPreDelayMinMs, tapPreDelayMaxMs] 随机时长
+    var tapPreDelayMinMs: Int
+        get() = prefs.getInt("tapPreDelayMinMs", 100)
+        set(v) = prefs.edit().putInt("tapPreDelayMinMs", v).apply()
+
+    var tapPreDelayMaxMs: Int
+        get() = prefs.getInt("tapPreDelayMaxMs", 1000)
+        set(v) = prefs.edit().putInt("tapPreDelayMaxMs", v).apply()
+
     var dragStartX: Float
         get() = prefs.getFloat("dragStartX", -1f)
         set(v) = prefs.edit().putFloat("dragStartX", v).apply()
