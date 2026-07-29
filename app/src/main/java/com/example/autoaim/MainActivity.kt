@@ -128,6 +128,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<EditText>(R.id.etThreshold).setText(Config.threshold.toString())
         findViewById<EditText>(R.id.etInterval).setText(Config.intervalMs.toString())
         findViewById<EditText>(R.id.etTolerance).setText(Config.centerTolerance.toString())
+        findViewById<EditText>(R.id.etMinMatches).setText(Config.minMatches.toString())
         findViewById<EditText>(R.id.etTapBase).setText(Config.tapBaseMs.toString())
         findViewById<EditText>(R.id.etTapJitter).setText(Config.tapJitterMs.toString())
         findViewById<EditText>(R.id.etTapPosJitter).setText(Config.tapPosJitterPx.toString())
@@ -144,7 +145,8 @@ class MainActivity : AppCompatActivity() {
         Config.sensitivity = findViewById<EditText>(R.id.etSensitivity).text.toString().toFloatOrNull() ?: 1f
         Config.threshold = findViewById<EditText>(R.id.etThreshold).text.toString().toFloatOrNull() ?: 0.75f
         Config.intervalMs = findViewById<EditText>(R.id.etInterval).text.toString().toLongOrNull() ?: 500L
-        Config.centerTolerance = findViewById<EditText>(R.id.etTolerance).text.toString().toIntOrNull() ?: 15
+        Config.centerTolerance = findViewById<EditText>(R.id.etTolerance).text.toString().toIntOrNull() ?: 25
+        Config.minMatches = findViewById<EditText>(R.id.etMinMatches).text.toString().toIntOrNull() ?: 12
         Config.tapBaseMs = findViewById<EditText>(R.id.etTapBase).text.toString().toLongOrNull() ?: 50L
         Config.tapJitterMs = findViewById<EditText>(R.id.etTapJitter).text.toString().toIntOrNull() ?: 50
         Config.tapPosJitterPx = findViewById<EditText>(R.id.etTapPosJitter).text.toString().toIntOrNull() ?: 3
