@@ -73,6 +73,11 @@ object Config {
         get() = prefs.getInt("tapJitterMs", 50)
         set(v) = prefs.edit().putInt("tapJitterMs", v).apply()
 
+    // 点击坐标的随机微抖动范围（像素）：实际落点 = 目标 ± [0, tapPosJitterPx]
+    var tapPosJitterPx: Int
+        get() = prefs.getInt("tapPosJitterPx", 3)
+        set(v) = prefs.edit().putInt("tapPosJitterPx", v).apply()
+
     var dragStartX: Float
         get() = prefs.getFloat("dragStartX", -1f)
         set(v) = prefs.edit().putFloat("dragStartX", v).apply()

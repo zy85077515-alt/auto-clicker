@@ -130,6 +130,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<EditText>(R.id.etTolerance).setText(Config.centerTolerance.toString())
         findViewById<EditText>(R.id.etTapBase).setText(Config.tapBaseMs.toString())
         findViewById<EditText>(R.id.etTapJitter).setText(Config.tapJitterMs.toString())
+        findViewById<EditText>(R.id.etTapPosJitter).setText(Config.tapPosJitterPx.toString())
         findViewById<CheckBox>(R.id.cbLoop).isChecked = Config.loop
         findViewById<CheckBox>(R.id.cbClick).isChecked = Config.clickAfterAim
         findViewById<CheckBox>(R.id.cbInvert).isChecked = Config.invert
@@ -144,6 +145,7 @@ class MainActivity : AppCompatActivity() {
         Config.centerTolerance = findViewById<EditText>(R.id.etTolerance).text.toString().toIntOrNull() ?: 15
         Config.tapBaseMs = findViewById<EditText>(R.id.etTapBase).text.toString().toLongOrNull() ?: 50L
         Config.tapJitterMs = findViewById<EditText>(R.id.etTapJitter).text.toString().toIntOrNull() ?: 50
+        Config.tapPosJitterPx = findViewById<EditText>(R.id.etTapPosJitter).text.toString().toIntOrNull() ?: 3
         Config.loop = findViewById<CheckBox>(R.id.cbLoop).isChecked
         Config.clickAfterAim = findViewById<CheckBox>(R.id.cbClick).isChecked
         Config.invert = findViewById<CheckBox>(R.id.cbInvert).isChecked

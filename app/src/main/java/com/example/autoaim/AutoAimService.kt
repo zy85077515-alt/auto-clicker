@@ -222,8 +222,13 @@ class AutoAimService : Service() {
 
     private fun doClick() {
         val g = GestureService.instance ?: return
-        val x = if (Config.clickMode == 0) screenW / 2f else Config.clickX
-        val y = if (Config.clickMode == 0) screenH / 2f else Config.clickY
+        // 点击坐标微抖动：落点在目标 ± [0, tapPosJitterPx] 像素内随机
+        val pj = Config.tapPosJitterPx
+        val prange = if (pj > 0) (-pj..pj) else (0..0)
+        val jx = prange.random().toFloat()
+        val jy = prange.random().toFloat()
+        val x = (if (Config.clickMode == 0) screenW / 2f else Config.clickX) + jx
+        val y = (if (Config.clickMode == 0) screenH / 2f else Config.clickY) + jy
         // 每次点击的触摸时长 = 基础 ± 随机[0, tapJitterMs]，避免机械固定
         val jitter = Config.tapJitterMs
         val range = if (jitter > 0) (-jitter..jitter) else (0..0)
