@@ -165,11 +165,8 @@ class AutoAimService : Service() {
                     BitmapFactory.decodeFile(path) else null
                 loadedTemplatePath = path
                 if (templateBitmap != null) {
-                    val tw = maxOf(1, (templateBitmap!!.width * scale).toInt())
-                    val th = maxOf(1, (templateBitmap!!.height * scale).toInt())
-                    val scaledTmpl = ImageUtils.downscaleTo(templateBitmap!!, tw, th)
-                    TemplateMatcher.setTemplate(scaledTmpl)
-                    scaledTmpl.recycle()
+                    // 模板交由 TemplateMatcher 内部缩放到固定尺寸，避免按屏幕 scale 过度缩小导致特征丢失
+                    TemplateMatcher.setTemplate(templateBitmap!!)
                 }
             }
             val tmpl = templateBitmap
@@ -188,7 +185,7 @@ class AutoAimService : Service() {
             val cx = screenW / 2f
             val cy = screenH / 2f
             if (!res.found) {
-                updateStatus("未识别到目标")
+                updateStatus("未识别: ${res.detail}")
                 return
             }
             val tx = res.cx / scale

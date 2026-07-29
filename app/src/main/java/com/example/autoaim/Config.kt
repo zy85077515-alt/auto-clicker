@@ -32,11 +32,11 @@ object Config {
         set(v) = prefs.edit().putLong("intervalMs", v).apply()
 
     var centerTolerance: Int
-        get() = prefs.getInt("centerTolerance", 15)
+        get() = prefs.getInt("centerTolerance", 25)
         set(v) = prefs.edit().putInt("centerTolerance", v).apply()
 
     var maxDim: Int
-        get() = prefs.getInt("maxDim", 320)
+        get() = prefs.getInt("maxDim", 640)
         set(v) = prefs.edit().putInt("maxDim", v).apply()
 
     var step: Int

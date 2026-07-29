@@ -2,7 +2,6 @@ package com.example.autoaim
 
 import android.graphics.Bitmap
 import android.util.Log
-import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
@@ -15,126 +14,118 @@ import org.opencv.features2d.BFMatcher
 import org.opencv.features2d.ORB
 import org.opencv.imgproc.Imgproc
 
-/**
- * OpenCV 特征点匹配（ORB + 单应矩阵）。
- * 相比纯 NCC 模板匹配，对目标缩放 / 旋转具有不变性，
- * 适合实战中目标大小、角度变化较大的场景。
- */
 object TemplateMatcher {
 
-    private const val TAG = "TemplateMatcher"
-    private const val MAX_FEATURES = 2000
-
-    data class Result(val found: Boolean, val cx: Int, val cy: Int, val score: Float)
-
-    private var initialized = false
-    private var orb: ORB? = null
+    private var detector: ORB? = null
     private var matcher: BFMatcher? = null
-
     private var tmplKp: MatOfKeyPoint? = null
     private var tmplDesc: Mat? = null
     private var tmplW = 0
     private var tmplH = 0
 
-    @Synchronized
-    private fun ensureInit() {
-        if (initialized) return
+    init {
+        // Maven 包 org.opencv:opencv 需手动加载原生库，否则所有 OpenCV 调用会抛 UnsatisfiedLinkError
         try {
-            if (!OpenCVLoader.initLocal()) {
-                Log.w(TAG, "OpenCVLoader.initLocal 返回 false，将依赖自动加载")
-            }
+            System.loadLibrary("opencv_java4")
         } catch (e: Throwable) {
-            Log.w(TAG, "OpenCVLoader.initLocal 异常: ${e.message}")
+            Log.e("AutoAim", "OpenCV native load failed: ${e.message}")
         }
-        orb = ORB.create(MAX_FEATURES)
-        matcher = BFMatcher.create(Core.NORM_HAMMING, true) // crossCheck
-        initialized = true
-    }
-
-    private fun bitmapToGray(bmp: Bitmap): Mat {
-        val argb = Mat()
-        val copy = if (bmp.config == Bitmap.Config.ARGB_8888) bmp
-        else bmp.copy(Bitmap.Config.ARGB_8888, false)
-        Utils.bitmapToMat(copy, argb)
-        val gray = Mat()
-        Imgproc.cvtColor(argb, gray, Imgproc.COLOR_RGBA2GRAY)
-        argb.release()
-        return gray
-    }
-
-    fun setTemplate(tmpl: Bitmap) {
-        ensureInit()
-        val gray = bitmapToGray(tmpl)
-        tmplW = gray.width()
-        tmplH = gray.height()
-        tmplKp?.release()
-        tmplDesc?.release()
-        tmplKp = MatOfKeyPoint()
-        tmplDesc = Mat()
-        orb!!.detectAndCompute(gray, Mat(), tmplKp, tmplDesc)
-        gray.release()
-        Log.i(TAG, "模板特征点数量: ${tmplKp?.toList()?.size ?: 0}")
-    }
-
-    fun match(screen: Bitmap, minGood: Int): Result {
-        ensureInit()
-        val tkp = tmplKp
-        val tdesc = tmplDesc
-        if (tkp == null || tdesc == null || tdesc.empty() || tkp.toList().isEmpty()) {
-            return Result(false, 0, 0, 0f)
+        try {
+            detector = ORB.create()
+            detector?.setMaxFeatures(2000)
+            matcher = BFMatcher.create(Core.NORM_HAMMING, true) // crossCheck
+        } catch (e: Throwable) {
+            Log.e("AutoAim", "OpenCV init failed: ${e.message}")
         }
-        val gray = bitmapToGray(screen)
+    }
+
+    data class Result(
+        val found: Boolean,
+        val cx: Double,
+        val cy: Double,
+        val score: Float,
+        val detail: String = ""
+    ) {
+        companion object {
+            fun miss(d: String) = Result(false, 0.0, 0.0, 0f, d)
+        }
+    }
+
+    /** 设置模板：内部统一缩放到最长边 96px，避免按屏幕缩放被压得过小导致特征丢失 */
+    fun setTemplate(bmp: Bitmap) {
+        try {
+            val side = 96
+            val ratio = side.toFloat() / maxOf(bmp.width, bmp.height)
+            val tw = maxOf(1, (bmp.width * ratio).toInt())
+            val th = maxOf(1, (bmp.height * ratio).toInt())
+            val scaled = ImageUtils.downscaleTo(bmp, tw, th)
+            val mat = Mat()
+            Utils.bitmapToMat(scaled, mat)
+            val gray = Mat()
+            Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGBA2GRAY)
+            tmplW = scaled.width
+            tmplH = scaled.height
+            tmplKp = MatOfKeyPoint()
+            tmplDesc = Mat()
+            detector?.detectAndCompute(gray, Mat(), tmplKp, tmplDesc)
+            mat.release()
+            gray.release()
+            scaled.recycle()
+        } catch (e: Throwable) {
+            Log.e("AutoAim", "setTemplate failed: ${e.message}")
+        }
+    }
+
+    fun match(screen: Bitmap, minMatches: Int): Result {
+        if (detector == null || matcher == null) return Result.miss("OpenCV未初始化")
+        if (tmplDesc == null || tmplDesc!!.empty()) return Result.miss("模板未设置/为空")
+        val sMat = Mat()
+        Utils.bitmapToMat(screen, sMat)
+        val sGray = Mat()
+        Imgproc.cvtColor(sMat, sGray, Imgproc.COLOR_RGBA2GRAY)
         val kp = MatOfKeyPoint()
         val desc = Mat()
-        orb!!.detectAndCompute(gray, Mat(), kp, desc)
-        gray.release()
-        if (desc.empty() || kp.toList().isEmpty()) {
-            kp.release()
-            desc.release()
-            return Result(false, 0, 0, 0f)
+        detector!!.detectAndCompute(sGray, Mat(), kp, desc)
+        if (desc.empty()) {
+            sMat.release(); sGray.release()
+            return Result.miss("屏幕无特征")
         }
-        val matches = MatOfDMatch()
-        matcher!!.match(desc, tdesc, matches)
-        val all = matches.toArray().toMutableList()
-        matches.release()
-        desc.release()
-        all.sortBy { it.distance }
-        val good = all.take(minOf(all.size, 120))
-        if (good.size < minGood) {
-            kp.release()
-            return Result(false, 0, 0, 0f)
+        val raw = MatOfDMatch()
+        matcher!!.match(desc, tmplDesc, raw)
+        val list = raw.toList()
+        if (list.isEmpty()) {
+            sMat.release(); sGray.release()
+            return Result.miss("无匹配")
         }
-        val src = ArrayList<Point>() // 模板点 (train)
-        val dst = ArrayList<Point>() // 屏幕点 (query)
-        val tList = tkp.toList()
-        val sList = kp.toList()
-        for (m in good) {
-            src.add(tList[m.trainIdx].pt)
-            dst.add(sList[m.queryIdx].pt)
+        // 按汉明距离排序，取距离足够小的前若干个作为好匹配（阈值 64）
+        val sorted = list.sortedBy { it.distance }
+        val good = sorted.takeWhile { it.distance < 64.0 }
+        if (good.size < minMatches) {
+            sMat.release(); sGray.release()
+            return Result.miss("好匹配不足 ${good.size}/$minMatches")
         }
-        kp.release()
-        val srcMat = MatOfPoint2f(*src.toTypedArray())
-        val dstMat = MatOfPoint2f(*dst.toTypedArray())
-        val h = Calib3d.findHomography(srcMat, dstMat, Calib3d.RANSAC, 4.0)
-        srcMat.release()
-        dstMat.release()
+        val tmplPts = tmplKp!!.toList()
+        val scrPts = kp.toList()
+        val src = MatOfPoint2f(*good.map { tmplPts[it.trainIdx].pt }.toTypedArray())
+        val dst = MatOfPoint2f(*good.map { scrPts[it.queryIdx].pt }.toTypedArray())
+        val h = Calib3d.findHomography(src, dst, Calib3d.RANSAC, 5.0)
         if (h == null || h.empty()) {
-            return Result(false, 0, 0, good.size.toFloat())
+            sMat.release(); sGray.release()
+            return Result.miss("单应失败 g=${good.size}")
         }
-        val center = MatOfPoint2f(Point(tmplW / 2.0, tmplH / 2.0))
-        val dstCenter = MatOfPoint2f()
-        Core.perspectiveTransform(center, dstCenter, h)
-        val p = dstCenter.toArray()[0]
-        center.release()
-        dstCenter.release()
-        h.release()
-        return Result(true, p.x.toInt(), p.y.toInt(), good.size.toFloat())
-    }
-
-    fun release() {
-        tmplKp?.release()
-        tmplDesc?.release()
-        tmplKp = null
-        tmplDesc = null
+        // 用单应矩阵把模板四角映射到屏幕，求中心
+        val corners = arrayOf(
+            Point(0.0, 0.0),
+            Point(tmplW.toDouble(), 0.0),
+            Point(tmplW.toDouble(), tmplH.toDouble()),
+            Point(0.0, tmplH.toDouble())
+        )
+        val dstCorners = MatOfPoint2f()
+        Calib3d.perspectiveTransform(MatOfPoint2f(*corners), dstCorners, h)
+        val pts = dstCorners.toList()
+        val cx = pts.map { it.x }.average()
+        val cy = pts.map { it.y }.average()
+        sMat.release(); sGray.release()
+        return Result(true, cx, cy, good.size.toFloat(), "OK g=${good.size}")
     }
 }
