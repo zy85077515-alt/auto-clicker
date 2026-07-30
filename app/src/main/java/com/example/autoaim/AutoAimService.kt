@@ -206,7 +206,7 @@ class AutoAimService : Service() {
             val cy = screenH / 2f
             if (!res.found) {
                 val diag = TemplateMatcher.lastDiagnostic ?: ""
-                updateStatus("未识别: ${res.detail} | $diag")
+                updateStatus("没认出目标 | $diag")
                 return
             }
             val tx = res.cx / scale

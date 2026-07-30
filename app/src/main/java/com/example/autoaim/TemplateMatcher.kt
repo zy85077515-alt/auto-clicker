@@ -100,10 +100,10 @@ object TemplateMatcher {
                 if (!desc.empty()) built.add(TmplLevel(kp, desc, w, h))
             }
             levels = built
-            if (levels.isEmpty()) {
-                lastTemplateError = "模板无特征(关键点过少)，请改选纹理/边缘丰富区域"
-                Log.w("AutoAim", "setTemplate: 模板无可用特征")
-            }
+                if (levels.isEmpty()) {
+                    lastTemplateError = "模板区域太单调，找不到特征，请改选有纹理/文字/边缘的地方"
+                    Log.w("AutoAim", "setTemplate: 模板无可用特征")
+                }
         } catch (e: Throwable) {
             lastTemplateError = "模板加载失败: ${e.message}"
             Log.e("AutoAim", "setTemplate failed: ${e.message}")
@@ -111,8 +111,8 @@ object TemplateMatcher {
     }
 
     fun match(screen: Bitmap, minMatches: Int): Result {
-        if (detector == null || matcher == null) return Result.miss("OpenCV未初始化")
-        if (levels.isEmpty()) return Result.miss("模板未设置/为空")
+        if (detector == null || matcher == null) return Result.miss("识别引擎未启动")
+        if (levels.isEmpty()) return Result.miss("还没截取模板")
         val sMat = Mat()
         val sGray = Mat()
         val kp = MatOfKeyPoint()
@@ -122,7 +122,7 @@ object TemplateMatcher {
             Utils.bitmapToMat(screen, sMat)
             Imgproc.cvtColor(sMat, sGray, Imgproc.COLOR_RGBA2GRAY)
             detector!!.detectAndCompute(sGray, Mat(), kp, desc)
-            if (desc.empty()) return Result.miss("屏幕无特征")
+            if (desc.empty()) return Result.miss("当前画面太干净，找不到特征点")
             val scrPts = kp.toList()
 
             var bestGood = 0
@@ -167,9 +167,9 @@ object TemplateMatcher {
                     src.release(); dst.release()
                 }
             }
-            lastDiagnostic = "模板尺度:${levels.size} 屏幕特征:${scrPts.size} 最佳好匹配:$bestGood/$minMatches"
+            lastDiagnostic = "画面找到 ${scrPts.size} 个特征点，最好一档对上 $bestGood 个（需要 $minMatches 个）"
             if (bestResult != null) return bestResult!!
-            return Result.miss("好匹配不足 $bestGood/$minMatches")
+            return Result.miss("相似点只有 $bestGood 个（需要 $minMatches 个）")
         } finally {
             sMat.release(); sGray.release()
             kp.release(); desc.release(); raw.release()
