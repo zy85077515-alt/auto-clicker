@@ -177,8 +177,8 @@ class AutoAimService : Service() {
                     BitmapFactory.decodeFile(path) else null
                 loadedTemplatePath = path
                 if (templateBitmap != null) {
-                    // 模板交由 TemplateMatcher 内部缩放到固定尺寸，避免按屏幕 scale 过度缩小导致特征丢失
-                    TemplateMatcher.setTemplate(templateBitmap!!)
+                    // 模板按与屏幕相同的缩放系数对齐尺寸，并做多尺度匹配，避免尺寸不一致导致识别失败
+                    TemplateMatcher.setTemplate(templateBitmap!!, scale)
                 } else {
                     TemplateMatcher.clearTemplate()
                 }
@@ -205,7 +205,8 @@ class AutoAimService : Service() {
             val cx = screenW / 2f
             val cy = screenH / 2f
             if (!res.found) {
-                updateStatus("未识别: ${res.detail}")
+                val diag = TemplateMatcher.lastDiagnostic ?: ""
+                updateStatus("未识别: ${res.detail} | $diag")
                 return
             }
             val tx = res.cx / scale

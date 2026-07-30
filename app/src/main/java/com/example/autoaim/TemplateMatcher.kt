@@ -18,24 +18,21 @@ object TemplateMatcher {
 
     private var detector: ORB? = null
     private var matcher: BFMatcher? = null
-    private var tmplKp: MatOfKeyPoint? = null
-    private var tmplDesc: Mat? = null
-    private var tmplW = 0
-    private var tmplH = 0
+
+    private data class TmplLevel(val kp: MatOfKeyPoint, val desc: Mat, val w: Int, val h: Int) {
+        fun release() { kp.release(); desc.release() }
+    }
+    private var levels: List<TmplLevel> = emptyList()
 
     /** 最近一次设置模板的结果说明，便于 UI 给出明确提示 */
     var lastTemplateError: String? = null
         private set
+    /** 最近一次匹配的诊断信息（特征数、最佳好匹配数等） */
+    var lastDiagnostic: String? = null
+        private set
 
-    /** 模板是否已成功建立（有可用特征描述子） */
-    fun isTemplateReady(): Boolean = tmplDesc != null && !tmplDesc!!.empty()
-
-    /** 清空模板状态（如重新截取时） */
-    fun clearTemplate() {
-        tmplKp?.release(); tmplKp = null
-        tmplDesc?.release(); tmplDesc = null
-        lastTemplateError = null
-    }
+    // 多尺度：覆盖目标在屏幕中相对截取时 0.5x ~ 3x 的尺寸变化
+    private val SCALES = listOf(0.5f, 0.75f, 1.0f, 1.5f, 2.2f, 3.0f)
 
     init {
         // Maven 包 org.opencv:opencv 需手动加载原生库，否则所有 OpenCV 调用会抛 UnsatisfiedLinkError
@@ -65,29 +62,45 @@ object TemplateMatcher {
         }
     }
 
-    /** 设置模板：内部统一缩放到最长边 96px，避免按屏幕缩放被压得过小导致特征丢失 */
-    fun setTemplate(bmp: Bitmap) {
+    /** 模板是否已成功建立（有可用特征描述子） */
+    fun isTemplateReady(): Boolean = levels.isNotEmpty() && levels.any { !it.desc.empty() }
+
+    /** 清空模板状态 */
+    fun clearTemplate() {
+        levels.forEach { it.release() }
+        levels = emptyList()
+        lastTemplateError = null
+        lastDiagnostic = null
+    }
+
+    /**
+     * 设置模板：按与屏幕相同的缩放系数 screenScale 把模板放到 640 坐标系，
+     * 并在该尺寸附近生成多个尺度，保证与目标在屏幕中的实际尺寸一致。
+     */
+    fun setTemplate(bmp: Bitmap, screenScale: Float) {
+        clearTemplate()
         lastTemplateError = null
         try {
-            val side = 96
-            val ratio = side.toFloat() / maxOf(bmp.width, bmp.height)
-            val tw = maxOf(1, (bmp.width * ratio).toInt())
-            val th = maxOf(1, (bmp.height * ratio).toInt())
-            val scaled = ImageUtils.downscaleTo(bmp, tw, th)
-            val mat = Mat()
-            Utils.bitmapToMat(scaled, mat)
-            val gray = Mat()
-            Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGBA2GRAY)
-            tmplW = scaled.width
-            tmplH = scaled.height
-            tmplKp = MatOfKeyPoint()
-            tmplDesc = Mat()
-            detector?.detectAndCompute(gray, Mat(), tmplKp, tmplDesc)
-            mat.release()
-            gray.release()
-            scaled.recycle()
-            // 特征过少会导致永远匹配不到，这里记录明确原因
-            if (tmplDesc == null || tmplDesc!!.empty()) {
+            // 模板在 640 坐标系下的基础尺寸（与屏幕同一坐标系 → 尺寸天然对应）
+            val baseW = (bmp.width * screenScale).toInt().coerceIn(48, 320)
+            val baseH = (bmp.height * screenScale).toInt().coerceIn(48, 320)
+            val built = mutableListOf<TmplLevel>()
+            for (f in SCALES) {
+                val w = maxOf(16, (baseW * f).toInt())
+                val h = maxOf(16, (baseH * f).toInt())
+                val scaled = ImageUtils.downscaleTo(bmp, w, h)
+                val mat = Mat()
+                Utils.bitmapToMat(scaled, mat)
+                val gray = Mat()
+                Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGBA2GRAY)
+                val kp = MatOfKeyPoint()
+                val desc = Mat()
+                detector?.detectAndCompute(gray, Mat(), kp, desc)
+                mat.release(); gray.release(); scaled.recycle()
+                if (!desc.empty()) built.add(TmplLevel(kp, desc, w, h))
+            }
+            levels = built
+            if (levels.isEmpty()) {
                 lastTemplateError = "模板无特征(关键点过少)，请改选纹理/边缘丰富区域"
                 Log.w("AutoAim", "setTemplate: 模板无可用特征")
             }
@@ -99,52 +112,67 @@ object TemplateMatcher {
 
     fun match(screen: Bitmap, minMatches: Int): Result {
         if (detector == null || matcher == null) return Result.miss("OpenCV未初始化")
-        if (tmplDesc == null || tmplDesc!!.empty()) return Result.miss("模板未设置/为空")
-        // 所有原生 Mat 必须在 finally 中释放，否则每帧泄漏 native 内存最终导致进程被系统回收
+        if (levels.isEmpty()) return Result.miss("模板未设置/为空")
         val sMat = Mat()
         val sGray = Mat()
         val kp = MatOfKeyPoint()
         val desc = Mat()
         val raw = MatOfDMatch()
-        val src = MatOfPoint2f()
-        val dst = MatOfPoint2f()
-        val dstCorners = MatOfPoint2f()
-        var h: Mat? = null
         try {
             Utils.bitmapToMat(screen, sMat)
             Imgproc.cvtColor(sMat, sGray, Imgproc.COLOR_RGBA2GRAY)
             detector!!.detectAndCompute(sGray, Mat(), kp, desc)
             if (desc.empty()) return Result.miss("屏幕无特征")
-            matcher!!.match(desc, tmplDesc, raw)
-            val list = raw.toList()
-            if (list.isEmpty()) return Result.miss("无匹配")
-            // 按汉明距离排序，取距离足够小的前若干个作为好匹配（阈值 64）
-            val sorted = list.sortedBy { it.distance }
-            val good = sorted.takeWhile { it.distance < 64.0 }
-            if (good.size < minMatches) return Result.miss("好匹配不足 ${good.size}/$minMatches")
-            val tmplPts = tmplKp!!.toList()
             val scrPts = kp.toList()
-            src.release(); src.fromArray(*good.map { tmplPts[it.trainIdx].pt }.toTypedArray())
-            dst.release(); dst.fromArray(*good.map { scrPts[it.queryIdx].pt }.toTypedArray())
-            h = Calib3d.findHomography(src, dst, Calib3d.RANSAC, 5.0)
-            if (h == null || h.empty()) return Result.miss("单应失败 g=${good.size}")
-            // 用单应矩阵把模板四角映射到屏幕，求中心
-            val corners = arrayOf(
-                Point(0.0, 0.0),
-                Point(tmplW.toDouble(), 0.0),
-                Point(tmplW.toDouble(), tmplH.toDouble()),
-                Point(0.0, tmplH.toDouble())
-            )
-            Core.perspectiveTransform(MatOfPoint2f(*corners), dstCorners, h)
-            val pts = dstCorners.toList()
-            val cx = pts.map { it.x }.average()
-            val cy = pts.map { it.y }.average()
-            return Result(true, cx, cy, good.size.toFloat(), "OK g=${good.size}")
+
+            var bestGood = 0
+            var bestResult: Result? = null
+            lvlLoop@ for (lvl in levels) {
+                val tmplPts = lvl.kp.toList()
+                matcher!!.match(desc, lvl.desc, raw)
+                val list = raw.toList()
+                if (list.isEmpty()) continue
+                val sorted = list.sortedBy { it.distance }
+                // 按汉明距离排序，取距离足够小的前若干个作为好匹配（阈值 64）
+                val good = sorted.takeWhile { it.distance < 64.0 }
+                if (good.size > bestGood) bestGood = good.size
+                if (good.size < minMatches) continue
+                val src = MatOfPoint2f()
+                val dst = MatOfPoint2f()
+                try {
+                    src.fromArray(*good.map { tmplPts[it.trainIdx].pt }.toTypedArray())
+                    dst.fromArray(*good.map { scrPts[it.queryIdx].pt }.toTypedArray())
+                    val h = Mat()
+                    try {
+                        Calib3d.findHomography(src, dst, h, Calib3d.RANSAC, 5.0)
+                        if (h.empty()) continue@lvlLoop
+                        // 用单应矩阵把模板四角映射到屏幕，求中心
+                        val corners = arrayOf(
+                            Point(0.0, 0.0),
+                            Point(lvl.w.toDouble(), 0.0),
+                            Point(lvl.w.toDouble(), lvl.h.toDouble()),
+                            Point(0.0, lvl.h.toDouble())
+                        )
+                        val dstCorners = MatOfPoint2f()
+                        Core.perspectiveTransform(MatOfPoint2f(*corners), dstCorners, h)
+                        val pts = dstCorners.toList()
+                        val cx = pts.map { it.x }.average()
+                        val cy = pts.map { it.y }.average()
+                        val r = Result(true, cx, cy, good.size.toFloat(), "OK g=${good.size}")
+                        if (bestResult == null || r.score > bestResult!!.score) bestResult = r
+                    } finally {
+                        h.release()
+                    }
+                } finally {
+                    src.release(); dst.release()
+                }
+            }
+            lastDiagnostic = "模板尺度:${levels.size} 屏幕特征:${scrPts.size} 最佳好匹配:$bestGood/$minMatches"
+            if (bestResult != null) return bestResult!!
+            return Result.miss("好匹配不足 $bestGood/$minMatches")
         } finally {
             sMat.release(); sGray.release()
             kp.release(); desc.release(); raw.release()
-            src.release(); dst.release(); dstCorners.release()
-            h?.release()
         }
     }
 }
