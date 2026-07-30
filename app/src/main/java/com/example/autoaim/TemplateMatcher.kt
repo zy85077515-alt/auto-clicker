@@ -142,9 +142,8 @@ object TemplateMatcher {
                 try {
                     src.fromArray(*good.map { tmplPts[it.trainIdx].pt }.toTypedArray())
                     dst.fromArray(*good.map { scrPts[it.queryIdx].pt }.toTypedArray())
-                    val h = Mat()
+                    val h = Calib3d.findHomography(src, dst, Calib3d.RANSAC, 5.0)
                     try {
-                        Calib3d.findHomography(src, dst, h, Calib3d.RANSAC, 5.0)
                         if (h.empty()) continue@lvlLoop
                         // 用单应矩阵把模板四角映射到屏幕，求中心
                         val corners = arrayOf(
