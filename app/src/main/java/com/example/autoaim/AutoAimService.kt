@@ -227,8 +227,9 @@ class AutoAimService : Service() {
                 return
             }
             val dir = if (Config.invert) -1 else 1
-            val sx = (if (Config.dragStartX < 0) cx else Config.dragStartX).toFloat()
-            val sy = (if (Config.dragStartY < 0) cy else Config.dragStartY).toFloat()
+            // 默认(-1)时使用屏幕中上偏右位置（游戏主画面区域），而非正中心
+            val sx = if (Config.dragStartX < 0) screenW * 0.62f else Config.dragStartX.toFloat()
+            val sy = if (Config.dragStartY < 0) screenH * 0.28f else Config.dragStartY.toFloat()
             val ex = sx + (offX * Config.sensitivity * dir).toFloat()
             val ey = sy + (offY * Config.sensitivity * dir).toFloat()
             g.swipe(sx, sy, ex, ey, 150)
